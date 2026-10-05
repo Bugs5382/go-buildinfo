@@ -23,6 +23,10 @@ tasks:
     desc: Run tests
     cmds:
       - go test -parallel {{.TESTPARALLELISM}} ./...
+  test-integration:
+    desc: Run the integration tests against real PostgreSQL, RabbitMQ and Valkey containers (needs Docker)
+    cmds:
+      - go test -tags integration -run Integration -count=1 -v ./...
   test-cover:
     desc: Run tests with coverage reporting
     cmds:
