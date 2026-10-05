@@ -1,4 +1,11 @@
-package buildinfo
+// Package httpbuildinfo serves build info and dependency health over HTTP.
+//
+// Readyz answers 200 with a JSON report while the service is ready (ok or
+// degraded) and 503 while a required dependency is down. Livez answers 200
+// while the process serves HTTP and never checks dependencies. Both, and
+// Middleware around any handler, set the <Prefix>-Version, <Prefix>-Commit,
+// <Prefix>-Dep-<Name> and <Prefix>-Depstate-<Name> headers.
+package httpbuildinfo
 
 /*
 MIT License
@@ -22,10 +29,3 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 */
-
-import "fmt"
-
-// Hello greets a name. Replace with the package's real entry point.
-func Hello(name string) string {
-	return fmt.Sprintf("Hello, %s!", name)
-}

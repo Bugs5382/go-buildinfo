@@ -1,4 +1,17 @@
-package buildinfo
+// Package grpcbuildinfo reports build info and dependency health over the
+// standard gRPC health service.
+//
+// The server side wraps grpc-go's health server: its interceptors add
+// <prefix>-version and <prefix>-commit headers to Health/Check (or to every
+// RPC with WithAllRPCs), add each dependency's <prefix>-dep-<name> version
+// and <prefix>-depstate-<name> state, and set the serving status of "" and
+// the WithServices names to NOT_SERVING while a required dependency is down.
+// Run keeps the status current for Health/Watch subscribers. A
+// WithLivenessService name is always SERVING and never checks dependencies.
+//
+// Read is the client side: it calls Health/Check on another service and
+// returns its serving status and parsed headers.
+package grpcbuildinfo
 
 /*
 MIT License
@@ -22,13 +35,3 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 */
-
-import "testing"
-
-func TestHello(t *testing.T) {
-	got := Hello("world")
-	want := "Hello, world!"
-	if got != want {
-		t.Errorf("Hello() = %q, want %q", got, want)
-	}
-}
