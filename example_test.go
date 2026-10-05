@@ -1,4 +1,4 @@
-package buildinfo
+package buildinfo_test
 
 /*
 MIT License
@@ -23,9 +23,14 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 */
 
-import "fmt"
+import (
+	"fmt"
 
-// Hello greets a name. Replace with the package's real entry point.
-func Hello(name string) string {
-	return fmt.Sprintf("Hello, %s!", name)
+	buildinfo "github.com/Bugs5382/go-buildinfo"
+)
+
+func ExampleGet() {
+	info := buildinfo.Get()
+	fmt.Println(info.Version != "", info.Commit != "")
+	// Output: true true
 }

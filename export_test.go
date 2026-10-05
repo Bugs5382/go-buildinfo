@@ -1,24 +1,3 @@
-// Package buildinfo reports which build of a Go service is running: its
-// version and commit, stamped at link time with -ldflags -X and falling back
-// to the VCS revision Go records, plus the Go version and the modified flag.
-//
-// Stamp a build with
-//
-//	go build -ldflags "-X github.com/Bugs5382/go-buildinfo.Version=v1.2.3 -X github.com/Bugs5382/go-buildinfo.Commit=$(git rev-parse HEAD)"
-//
-// and read it with Get. An unstamped version is "dev"; an unstamped commit
-// is the build's vcs.revision, else "unknown".
-//
-// The sub-packages put the same facts on the wire:
-//
-//   - health checks the service's dependencies with a timeout and a cached
-//     result per check, and aggregates them into a readiness report.
-//   - grpcbuildinfo adds <prefix>-version, <prefix>-commit and the
-//     dependency headers to grpc.health.v1.Health/Check, drives the health
-//     server's serving status from readiness, and reads another service's
-//     headers.
-//   - httpbuildinfo serves /readyz and /livez and sets the same headers on
-//     HTTP responses.
 package buildinfo
 
 /*
@@ -43,3 +22,11 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 */
+
+import "runtime/debug"
+
+func SetReadBuildInfo(f func() (*debug.BuildInfo, bool)) (restore func()) {
+	old := readBuildInfo
+	readBuildInfo = f
+	return func() { readBuildInfo = old }
+}
