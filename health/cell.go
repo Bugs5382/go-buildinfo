@@ -75,6 +75,27 @@ func (c *cell) get(ctx context.Context) result {
 	return result{c.value, c.err, c.at}
 }
 
+// peek returns the cached result without running the probe; ok is false
+// until the first result is recorded.
+func (c *cell) peek() (result, bool) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return result{c.value, c.err, c.at}, c.has
+}
+
+// refresh runs the probe now, whatever the TTL, unless a run is in flight,
+// and waits until it settles: it finishes or times out. A run that outlived
+// its timeout has settled, so refresh returns at once while it hangs.
+func (c *cell) refresh(ctx context.Context) {
+	c.mu.Lock()
+	if !c.running {
+		c.start(context.WithoutCancel(ctx))
+	}
+	settled := c.settled
+	c.mu.Unlock()
+	<-settled
+}
+
 // start runs with c.mu held.
 func (c *cell) start(parent context.Context) {
 	c.running = true
