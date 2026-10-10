@@ -1,6 +1,6 @@
 module github.com/Bugs5382/go-buildinfo
 
-go 1.26
+go 1.26.9
 
 require (
 	github.com/Bugs5382/go-log v1.3.0
@@ -15,8 +15,8 @@ require (
 	github.com/rs/zerolog v1.35.1 // indirect
 	go.opentelemetry.io/otel v1.44.0 // indirect
 	go.opentelemetry.io/otel/trace v1.44.0 // indirect
-	golang.org/x/net v0.57.0 // indirect
-	golang.org/x/sys v0.47.0 // indirect
-	golang.org/x/text v0.40.0 // indirect
+	golang.org/x/net v0.60.0 // indirect
+	golang.org/x/sys v0.48.0 // indirect
+	golang.org/x/text v0.42.0 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20260706201446-f0a921348800 // indirect
 )
