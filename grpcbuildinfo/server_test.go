@@ -349,3 +349,34 @@ func TestRunDrivesTheServingStatus(t *testing.T) {
 	d.down.Store(false)
 	next(healthpb.HealthCheckResponse_SERVING)
 }
+
+func TestBackgroundCheckerAnswersReadinessFromTheCache(t *testing.T) {
+	var slow atomic.Bool
+	c := health.New(health.WithBackgroundRefresh(), health.WithTTL(10*time.Millisecond), health.WithTimeout(time.Second))
+	if err := c.Register(health.Dependency{Name: "postgres", Required: true, Check: func(ctx context.Context) error {
+		if slow.Load() {
+			<-ctx.Done()
+			return ctx.Err()
+		}
+		return nil
+	}}); err != nil {
+		t.Fatal(err)
+	}
+	h := start(t, grpcbuildinfo.WithPrefix("acme"), grpcbuildinfo.WithChecker(c))
+	if st, md := check(t, h.conn, ""); st != healthpb.HealthCheckResponse_NOT_SERVING || one(md, "acme-depstate-postgres") != "down" {
+		t.Fatalf("before the first refresh: status %v headers %v; want NOT_SERVING, postgres down", st, md)
+	}
+	runCtx, cancel := context.WithCancel(context.Background())
+	done := make(chan struct{})
+	go func() { c.Run(runCtx); close(done) }()
+	t.Cleanup(func() { cancel(); <-done })
+	eventually(t, func() bool { st, _ := check(t, h.conn, ""); return st == healthpb.HealthCheckResponse_SERVING }, "SERVING")
+
+	slow.Store(true)
+	time.Sleep(50 * time.Millisecond)
+	begin := time.Now()
+	check(t, h.conn, "")
+	if d := time.Since(begin); d > 200*time.Millisecond {
+		t.Fatalf("Check took %v during a slow dependency check; want a cache read", d)
+	}
+}

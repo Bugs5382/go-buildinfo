@@ -40,6 +40,9 @@ const (
 	ClassDNS      = "dns"
 	ClassNetwork  = "network"
 	ClassError    = "error"
+	// ClassPending marks a dependency a background-refresh Checker has not
+	// checked yet.
+	ClassPending = "pending"
 )
 
 type classified struct {

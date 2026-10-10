@@ -5,7 +5,8 @@
 // timeout, reuses a result for the TTL, and never runs a second copy of a
 // check that has not returned, so probes cannot pile up goroutines on a hung
 // dependency. A failing, slow or panicking check marks its dependency down,
-// never the caller.
+// never the caller. With WithBackgroundRefresh, Report only reads the cache
+// and Run does the checking once per TTL, so a probe never waits on a check.
 //
 // A required dependency that is down makes the service not ready; an
 // optional one only makes it degraded. Readiness follows the dependencies

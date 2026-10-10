@@ -87,6 +87,7 @@ const (
 // concurrent use.
 type Checker struct {
 	ttl, timeout, versionTTL time.Duration
+	background               bool
 	logger                   log.Logger
 	now                      func() time.Time
 
@@ -121,6 +122,13 @@ func WithVersionTTL(d time.Duration) Option { return func(c *Checker) { c.versio
 // WithLogger logs dependency state changes (down, degraded, recovered) with
 // the dependency's name and error class. The default discards them.
 func WithLogger(l log.Logger) Option { return func(c *Checker) { c.logger = l } }
+
+// WithBackgroundRefresh makes Report a pure cache read: it never runs a
+// check or a version read, so a probe answers at once however slow a
+// dependency is. Run does the checking and must be started; until its first
+// pass settles, every dependency reports the class "pending" (down when
+// required, so the service starts not ready).
+func WithBackgroundRefresh() Option { return func(c *Checker) { c.background = true } }
 
 // New returns a Checker with no dependencies.
 func New(opts ...Option) *Checker {
@@ -205,7 +213,8 @@ type DependencyReport struct {
 // Report checks every dependency whose cached result is older than the TTL,
 // in parallel, and returns the aggregate. It waits at most about one check
 // timeout. A canceled ctx does not cut a check short, so a probe that gives
-// up never caches a false failure.
+// up never caches a false failure. With WithBackgroundRefresh it runs no
+// checks and returns the results Run last recorded.
 func (c *Checker) Report(ctx context.Context) Report {
 	c.mu.RLock()
 	deps := c.deps
@@ -236,13 +245,16 @@ func (c *Checker) reportOne(ctx context.Context, r *registered) DependencyReport
 	if r.version != nil {
 		wg.Go(func() {
 			d.Version = unknown
-			if v := r.version.get(ctx).value; v != "" {
+			if v := c.read(ctx, r.version).value; v != "" {
 				d.Version = safeValue(v)
 			}
 		})
 	}
 	if r.check != nil {
-		res := r.check.get(ctx)
+		res := c.read(ctx, r.check)
+		if c.background && res.at.IsZero() {
+			res.err = errPending
+		}
 		d.CheckedAt = res.at
 		if res.err != nil {
 			d.Error = classOf(res.err)
@@ -271,4 +283,53 @@ func (c *Checker) logTransition(r *registered, d DependencyReport) {
 		return
 	}
 	c.logger.Warn("dependency check failing", append(fields, log.F("error_class", d.Error))...)
+}
+
+var errPending = Classify(errors.New("health: not checked yet"), ClassPending)
+
+// read is the cached result, running the probe first when it is stale,
+// except with WithBackgroundRefresh, where only Run runs probes.
+func (c *Checker) read(ctx context.Context, cl *cell) result {
+	if c.background {
+		res, _ := cl.peek()
+		return res
+	}
+	return cl.get(ctx)
+}
+
+// Run refreshes every dependency once per TTL until ctx is done: each check
+// runs whatever its age, and each version read once it is older than the
+// version TTL. Checks run in parallel and a pass waits at most about one
+// check timeout; a hung check is not started again until it returns. After
+// each pass it logs state changes as Report does. Use it with
+// WithBackgroundRefresh, so probes only read what Run recorded; without that
+// option it keeps the cache warm while Report still refreshes stale results.
+func (c *Checker) Run(ctx context.Context) {
+	t := time.NewTicker(c.ttl)
+	defer t.Stop()
+	for {
+		c.refreshAll(ctx)
+		c.Report(ctx)
+		select {
+		case <-ctx.Done():
+			return
+		case <-t.C:
+		}
+	}
+}
+
+func (c *Checker) refreshAll(ctx context.Context) {
+	c.mu.RLock()
+	deps := c.deps
+	c.mu.RUnlock()
+	var wg sync.WaitGroup
+	for _, r := range deps {
+		if r.check != nil {
+			wg.Go(func() { r.check.refresh(ctx) })
+		}
+		if r.version != nil {
+			wg.Go(func() { r.version.get(ctx) })
+		}
+	}
+	wg.Wait()
 }

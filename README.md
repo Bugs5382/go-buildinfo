@@ -54,9 +54,24 @@ err := checker.Register(
 - A slow, failing or panicking check marks its dependency down; it never fails the call. A check
   that never returns is not started again until it does.
 - Reports carry an error class (`timeout`, `connection-refused`, `dns`, `network`, `canceled`,
-  `panic`, `error`, or your own with `health.Classify`), never the raw error. Version strings
+  `panic`, `pending`, `error`, or your own with `health.Classify`), never the raw error. Version strings
   that look like a URL, a `key=value` pair or anything outside a version's characters are sent as
   `redacted`.
+
+### Background refresh
+
+By default a probe that finds a result older than the TTL runs the check and waits for it (up to
+the timeout), so a probe with a short timeout can fail on a slow dependency. With
+`health.WithBackgroundRefresh()`, `Report` only reads the cache and `checker.Run(ctx)` re-checks
+every dependency once per TTL, so readiness answers at once whatever the dependency is doing.
+Until the first pass settles, each dependency reports the class `pending` (a required one is
+down, so the service starts not ready).
+
+```go
+checker := health.New(health.WithBackgroundRefresh(), health.WithTTL(5*time.Second))
+// register the dependencies, then:
+go checker.Run(ctx)
+```
 
 ### Short checkers
 
